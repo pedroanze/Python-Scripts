@@ -31,7 +31,7 @@ def convert_pdf_to_images(pdf_path):
 def ocr_image(image):
     """Realiza OCR en una imagen y devuelve el texto extraído"""
     try:
-        # Llamar a Tesseract sin el parámetro config para simplificar
+
         text = pytesseract.image_to_string(image, lang='spa')
         return text
     except Exception as e:
@@ -45,8 +45,8 @@ def save_text_to_pdf(text, output_path):
     text_object = c.beginText(50, height - 50)
     text_object.setFont("Helvetica", 10)
     
-    lines_per_page = 70  # Aproximadamente el número de líneas que caben en una página de tamaño carta
-    line_height = 12  # Altura de la línea en puntos
+    lines_per_page = 70  
+    line_height = 12  
 
     lines = text.split('\n')
     line_count = 0
