@@ -9,9 +9,9 @@ from reportlab.lib.pagesizes import legal
 from reportlab.lib import colors
 import streamlit as st
 
-# Configuración de Tesseract
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-os.environ['TESSDATA_PREFIX'] = r'C:\Program Files\Tesseract-OCR\tessdata'
+# Configuración de Tesseract en Local
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# os.environ['TESSDATA_PREFIX'] = r'C:\Program Files\Tesseract-OCR\tessdata'
 
 # Configuración de directorios
 input_dir = "input_documents"
