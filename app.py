@@ -5,13 +5,12 @@ import psutil
 from pdf2image import convert_from_path
 from PIL import Image, ImageEnhance
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import legal
+from reportlab.lib import colors
 import streamlit as st
 
 # Configuración de Tesseract
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-# Configuración de TESSDATA_PREFIX en el código
 os.environ['TESSDATA_PREFIX'] = r'C:\Program Files\Tesseract-OCR\tessdata'
 
 # Configuración de directorios
@@ -52,12 +51,39 @@ def ocr_image(image):
         st.error(f"Error en OCR: {e}")
         return ""
 
-def save_text_to_pdf(all_pages_text, output_path):
-    """Guarda el texto extraído en un archivo PDF con tamaño Carta, respetando la estructura de páginas y evitando páginas en blanco."""
-    c = canvas.Canvas(output_path, pagesize=letter)
-    width, height = letter
+def format_text_apa(text):
+    """Aplica formato APA al texto según palabras clave y elimina términos no deseados"""
+    formatted_text = []
+    
+    for line in text.splitlines():
+        if "COPIA LEGALIZADA" in line:
+            continue  # Omitir esta línea
 
-    # Márgenes y configuración de línea
+        # Formato de "CAPÍTULO N"
+        if line.startswith("CAPÍTULO") and line[-1].isdigit():
+            formatted_text.append(("bold", line.upper()))  # Todo en mayúsculas y en negrita
+            continue
+        
+        # Formato de "Artículo N."
+
+        if line.startswith("Artículo") and "." in line:
+            article_split = line.split(".", 1)
+            # Mantener el artículo y el texto posterior en la misma línea
+            formatted_text.append(("bold-normal", article_split[0] + ". " + article_split[1].strip()))
+            continue
+
+        # Texto en mayúsculas en negrita, el resto en normal
+        if line.isupper():
+            formatted_text.append(("bold", line))
+        else:
+            formatted_text.append(("normal", line))
+    
+    return formatted_text
+
+def save_text_to_pdf(all_pages_text, output_path):
+    """Guarda el texto extraído en un archivo PDF con tamaño legal y formato APA"""
+    c = canvas.Canvas(output_path, pagesize=legal)
+    width, height = legal
     left_margin = 50
     top_margin = height - 50
     line_height = 12
@@ -66,32 +92,53 @@ def save_text_to_pdf(all_pages_text, output_path):
     for page_number, page_text in enumerate(all_pages_text, start=1):
         print(f"\nProcessing page {page_number}")
         text_object = c.beginText(left_margin, top_margin)
-        text_object.setFont("Helvetica", 10)
+        text_object.setFont("Times-Roman", 12)  # Configuración de fuente APA
 
-        # Dividir el texto en líneas y contar
-        lines = page_text.splitlines()
-        print(f"Number of lines on page {page_number}: {len(lines)}")
-
+        lines = format_text_apa(page_text)
         line_count = 0
-        for line in lines:
+        previous_line_blank = False
+
+        for style, line in lines:
             if line_count >= max_lines_per_page:
                 c.drawText(text_object)
                 c.showPage()
                 text_object = c.beginText(left_margin, top_margin)
-                text_object.setFont("Helvetica", 10)
+                text_object.setFont("Times-Roman", 12)
                 line_count = 0
+                previous_line_blank = False
 
-            if line.strip():  # Solo agregar líneas no vacías
-                print(f"Adding line to page {page_number}: {line}")
+            # Detectar saltos de párrafo
+            if not line.strip():  # Línea en blanco
+                if not previous_line_blank:
+                    line_count += 1  # Contar salto de línea
+                    text_object.textLine("")  # Añadir línea en blanco en el PDF
+                    previous_line_blank = True
+                continue
+            previous_line_blank = False
+
+            # Aplicar formato de estilo
+            if style == "bold":
+                text_object.setFont("Times-Bold", 12)
+            elif style == "bold-normal":
+                # Aplicar negrita a "Artículo N." y el resto en normal
+                article_part, normal_part = line.split(". ", 1)
+                text_object.setFont("Times-Bold", 12)
+                text_object.textOut(article_part + ". ")
+                text_object.setFont("Times-Roman", 12)
+                text_object.textLine(normal_part)
+            else:
+                text_object.setFont("Times-Roman", 12)
+
+            if style != "bold-normal":
                 text_object.textLine(line)
-                line_count += 1
+                
+            line_count += 1
 
-        # Finaliza la página actual solo si contiene texto
+
         if line_count > 0:
             c.drawText(text_object)
             c.showPage()
 
-    # Guardar el archivo PDF
     c.save()
     print("PDF generation completed.")
 
@@ -118,7 +165,7 @@ def process_pdf(pdf_path, output_path):
         metrics["cpu_usage"] /= metrics["pages_processed"]
         metrics["memory_usage"] /= metrics["pages_processed"]
 
-        # Guardar todo el texto extraído en un PDF con formato Carta
+        # Guardar todo el texto extraído en un PDF con formato legal
         save_text_to_pdf(all_pages_text, output_path)
         metrics["output_pdf_size"] = os.path.getsize(output_path) / 1024
         return True
